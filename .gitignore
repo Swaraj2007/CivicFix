@@ -1,0 +1,55 @@
+# Environments
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env_python/
+
+# Machine Learning / Hugging Face
+hf_cache/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+
+# Databases & Data
+data/
+db_data/
+*.sqlite3
+*.db
+pgdata/
+
+# Logs & Temp
+logs/
+*.log
+tmp/
+temp/
+.temp/
+uploads/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

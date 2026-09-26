@@ -1,0 +1,40 @@
+services:
+  db:
+    build: ./db
+    environment:
+      POSTGRES_USER: civicfix
+      POSTGRES_PASSWORD: civicfix
+      POSTGRES_DB: civicfix
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U civicfix"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/code
+      - ./data:/data
+      - ./ml:/ml
+      - ./ml/hf_cache:/ml/hf_cache
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://civicfix:civicfix@db:5432/civicfix
+      JWT_SECRET: dev-secret-change-me
+      UPLOAD_DIR: /data/uploads
+      HF_HOME: /ml/hf_cache
+      CORS_ORIGIN: http://localhost:5173
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
