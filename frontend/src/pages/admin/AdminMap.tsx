@@ -37,14 +37,18 @@ export function AdminMap({ navigate }: Props) {
 
   const markers = useMemo(() => {
     const filtered = complaints.filter((c) => {
+      const lat = parseFloat(c.latitude as any);
+      const lng = parseFloat(c.longitude as any);
+      if (isNaN(lat) || isNaN(lng)) return false;
+
       if (filter === 'All')      return true;
       if (filter === 'Resolved') return c.status === 'Resolved';
       return c.priorityLevel === filter && c.status !== 'Resolved';
     });
     return filtered.map((c) => ({
       id:         c.id,
-      latitude:   c.latitude,
-      longitude:  c.longitude,
+      latitude:   Number(c.latitude),
+      longitude:  Number(c.longitude),
       priority:   c.priorityLevel as 'Critical' | 'High' | 'Medium' | 'Low',
       status:     c.status,
       popupHtml: `

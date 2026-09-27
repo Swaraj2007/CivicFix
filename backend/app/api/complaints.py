@@ -232,7 +232,6 @@ def map_complaints(db: Session = Depends(get_db), user: User = Depends(require_r
         select(Complaint)
         .where(Complaint.latitude.isnot(None), Complaint.longitude.isnot(None))
         .order_by(desc(Complaint.created_at))
-        .limit(500)
     )
     rows = db.execute(stmt).scalars().all()
 

@@ -3,27 +3,11 @@ import time
 from typing import Optional
 
 
-USER_AGENT = "CivicFix-Hackathon/0.1 (contact: civicfix@example.com)"
+USER_AGENT = "CivicFixApp-Swaraj/2.0 (contact: test.swaraj@google.com)"
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 
 _last_request_time = 0.0
 _MIN_INTERVAL = 1.1
-
-FALLBACKS = {
-    "alandi": (18.6774, 73.8987),
-    "pune": (18.5204, 73.8567),
-    "mumbai": (19.0760, 72.8777),
-    "delhi": (28.6139, 77.2090),
-    "bangalore": (12.9716, 77.5946),
-    "station road": (18.5204, 73.8567),
-    "gandhi chowk": (18.5204, 73.8567),
-    "bus stop": (18.6774, 73.8987),
-    "bus stand": (18.6774, 73.8987),
-    "college": (18.6774, 73.8987),
-    "hospital": (18.5204, 73.8567),
-    "school": (18.5204, 73.8567),
-    "market": (18.5204, 73.8567),
-}
 
 
 def _rate_limit():
@@ -34,53 +18,59 @@ def _rate_limit():
     _last_request_time = time.time()
 
 
-def _fallback(query: str) -> Optional[dict]:
-    q = query.lower()
-    for key, (lat, lng) in FALLBACKS.items():
-        if key in q:
-            return {
-                "latitude": lat,
-                "longitude": lng,
-                "display_name": f"(fallback) {query}",
-            }
-    return None
-
-
 def geocode(query: str, country: str = "India") -> Optional[dict]:
     if not query or len(query.strip()) < 3:
         return None
 
     _rate_limit()
+    
+    # Ensure Pune context
+    q = query
+    if "pune" not in q.lower():
+        q += ", Pune"
+    if "maharashtra" not in q.lower():
+        q += ", Maharashtra"
 
+    # Viewbox for Pune District approx:
+    # left (min lon), top (max lat), right (max lon), bottom (min lat)
+    # lon: 73.2 to 74.5, lat: 18.0 to 19.3
     params = {
-        "q": f"{query}, {country}",
+        "q": q,
         "format": "json",
-        "limit": 1,
+        "limit": 5,
+        "viewbox": "73.2,19.3,74.5,18.0",
+        "bounded": 1,
+        "countrycodes": "in"
     }
     headers = {"User-Agent": USER_AGENT}
 
     try:
         with httpx.Client(timeout=10.0) as client:
             r = client.get(NOMINATIM_URL, params=params, headers=headers)
-        print(f"[geocoder] nominatim status={r.status_code} query={query!r}")
+        print(f"[geocoder] nominatim status={r.status_code} query={q!r}")
 
         if r.status_code == 200:
             data = r.json()
-            if data:
-                hit = data[0]
+            # Filter results to strictly Pune/PCMC/Haveli/Alandi area
+            valid_results = []
+            for hit in data:
+                display_name = hit.get("display_name", "").lower()
+                if any(region in display_name for region in ["pune", "pimpri-chinchwad", "alandi", "haveli"]):
+                    valid_results.append(hit)
+            
+            if valid_results:
+                # Prefer more specific? The first returned valid is fine.
+                hit = valid_results[0]
                 return {
                     "latitude": float(hit["lat"]),
                     "longitude": float(hit["lon"]),
                     "display_name": hit.get("display_name", ""),
                 }
     except Exception as e:
-        print(f"[geocoder] nominatim error for {query!r}: {e}")
+        print(f"[geocoder] nominatim error for {q!r}: {e}")
 
-    # Fallback to local map if Nominatim failed
-    fb = _fallback(query)
-    if fb:
-        print(f"[geocoder] using fallback for {query!r}")
-    return fb
+    # No fallback that invents coordinates
+    return None
 
 
 def geocode_with_cache(query: str, db, Complaint_model) -> Optional[dict]:
@@ -101,6 +91,13 @@ def geocode_with_cache(query: str, db, Complaint_model) -> Optional[dict]:
     )
     row = db.execute(stmt).first()
     if row:
-        return {"latitude": row[0], "longitude": row[1], "display_name": "(cached)"}
+        # Check if the cached coordinate was MANAPA. If so, bypass the cache and geocode again
+        # since it's likely a bad cache hit from before.
+        lat, lng = row[0], row[1]
+        # MANAPA fallback coords were exactly 18.5204, 73.8567
+        if abs(lat - 18.5204) < 0.0001 and abs(lng - 73.8567) < 0.0001:
+            print(f"[geocoder] Ignoring bad cached MANAPA result for {query!r}")
+        else:
+            return {"latitude": lat, "longitude": lng, "display_name": "(cached)"}
 
     return geocode(query)

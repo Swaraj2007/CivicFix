@@ -53,3 +53,7 @@ uploads/
 *.njsproj
 *.sln
 *.sw?
+
+frontend/.vite/
+
+frontend/.vite/
